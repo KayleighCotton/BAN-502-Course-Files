@@ -1,0 +1,276 @@
+---
+title: "Course Project Phase 2"
+author: "Kayleigh Cotton"
+date: "2025-06-01"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Loading Packages and importing dataset}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+library(splines)
+library(mice) #package for imputation
+library(VIM) #visualizing missingness
+library(naniar) #visualizing missingness
+library(skimr) #alternative way to view dataset summaries
+library(UpSetR)
+library(caret)
+library(gridExtra)
+library(vip)
+library(ranger)
+train_set <- read_csv("~/Desktop/BAN 502- Predictive Analytics/Course Project/train.csv")
+test_set <- read_csv("~/Desktop/BAN 502- Predictive Analytics/Course Project/test.csv")
+```
+
+```{r Summary of the Data}
+str(train_set)
+summary(train_set)
+skim(train_set)
+ggcorr(train_set)
+```
+
+Row wise deletion of any row with at least one missing variable
+```{r Row Wise Deletion}
+train_rowdel = train_set %>% drop_na() 
+skim(train_rowdel)
+```
+This removed 14,387 rows or 54.15% of the rows.
+
+
+```{r Imputing the missing data}
+set.seed(1234)
+imp_train = mice(train_set, m=5, method = 'pmm',printFlag = FALSE)
+summary(imp_train)
+```
+
+```{r}
+train_set_complete = complete(imp_train)
+str(train_set_complete)
+summary(train_set_complete)
+skim(train_set_complete)
+```
+
+```{r}
+train_set_factor = train_set_complete %>% mutate(failure = as_factor(failure)) %>% 
+  mutate(failure = fct_recode(failure, "No" = "0", "Yes" = "1" )) %>%
+  mutate(product_code = as_factor(product_code)) %>%
+  mutate(product_code = fct_recode(product_code, "A" = "0", "B" = "1", "C" = "2", "D" = "3", "E" = "4")) %>%
+  mutate(attribute_0 = as_factor(attribute_0)) %>%
+  mutate(attribute_0 = fct_recode(attribute_0, "material_5" = "0", "material_7" = "1")) %>%
+  mutate(attribute_1 = as_factor(attribute_1)) %>%
+  mutate(attribute_1 = fct_recode(attribute_1, "material_5" = "0", "material_6" = "1", "material_8" = "2")) 
+
+str(train_set_factor)
+summary(train_set_factor)
+skim(train_set_factor)
+```
+
+Now we'll split the data.  
+```{r}
+set.seed(1234) 
+train_set_factor_split = initial_split(train_set_factor, prop = 0.7, strata = failure) 
+train = training(train_set_factor_split)
+test = testing(train_set_factor_split)
+```
+
+Set up our folds for cross-validation  
+```{r}
+set.seed(123)
+rf_folds = vfold_cv(train, v = 5)
+```
+
+Random forest with an R-defined tuning grid
+```{r}
+train_set_recipe = recipe(failure ~., train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+rf_model = rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
+  set_engine("ranger", importance = "permutation") %>% 
+  set_mode("classification")
+
+train_set_wflow = 
+  workflow() %>% 
+  add_model(rf_model) %>% 
+  add_recipe(train_set_recipe)
+
+set.seed(123)
+rf_res = tune_grid(
+  train_set_wflow,
+  resamples = rf_folds,
+  grid = 10
+)
+```
+
+```{r}
+rf_res %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  dplyr::select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+    values_to = "value",
+    names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "Accuracy")
+```
+
+```{r}
+train_set_recipe2 = recipe(failure ~., train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+rf_model2 = rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
+  set_engine("ranger", importance = "permutation") %>% 
+  set_mode("classification")
+
+train_set_wflow2 = 
+  workflow() %>% 
+  add_model(rf_model2) %>% 
+  add_recipe(train_set_recipe2)
+
+rf_grid = grid_regular(
+  mtry(range = c(10, 20)), 
+  min_n(range = c(10, 30)), 
+  levels = 5
+)
+
+set.seed(123)
+rf_res_tuned = tune_grid(
+  train_set_wflow2,
+  resamples = rf_folds,
+  grid = rf_grid
+)
+```
+
+```{r}
+rf_res_tuned %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  dplyr::select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+    values_to = "value",
+    names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "Accuracy")
+```
+An alternate view of the parameters  
+```{r}
+rf_res_tuned %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  mutate(min_n = factor(min_n)) %>%
+  ggplot(aes(mtry, mean, color = min_n)) +
+  geom_line(alpha = 0.5, size = 1.5) +
+  geom_point() +
+  labs(y = "Accuracy")
+```
+
+```{r}
+best_rf = select_best(rf_res_tuned, metric="accuracy")
+
+final_rf = finalize_workflow(
+  train_set_wflow2,
+  best_rf
+)
+
+final_rf
+```
+
+```{r}
+final_rf_fit = fit(final_rf, train)
+```
+Check out variable importance
+```{r}
+final_rf_fit %>% pull_workflow_fit() %>% vip(geom = "point")
+```
+Predictions  
+```{r}
+trainpredrf = predict(final_rf_fit, train)
+head(trainpredrf)
+```
+Confusion matrix
+```{r}
+confusionMatrix(trainpredrf$.pred_class, train$failure, 
+                positive = "Yes")
+```
+Predictions on test
+```{r}
+testpredrf = predict(final_rf_fit, test)
+head(testpredrf)
+confusionMatrix(testpredrf$.pred_class, test$failure, 
+                positive = "Yes")
+```
+
+```{r}
+set.seed(1234)
+imp_test = mice(test_set, m=5, method = 'pmm',printFlag = FALSE)
+summary(imp_test)
+
+test_set_complete = complete(imp_test)
+
+test_set_clean = test_set_complete %>% 
+  mutate(product_code = as_factor(product_code)) %>%
+  mutate(product_code = fct_recode(product_code, "A" = "0", "B" = "1", "C" = "2", "D" = "3", "E" = "4")) %>%
+  mutate(attribute_0 = as_factor(attribute_0)) %>%
+  mutate(attribute_0 = fct_recode(attribute_0, "material_5" = "0", "material_7" = "1")) %>%
+  mutate(attribute_1 = as_factor(attribute_1)) %>%
+  mutate(attribute_1 = fct_recode(attribute_1, "material_5" = "0", "material_6" = "1", "material_8" = "2")) 
+
+str(test_set_clean)
+summary(test_set_clean)
+skim(test_set_clean)
+```
+
+```{r Predictions on Test Set}
+test_setpredrf = predict(final_rf_fit, test_set_clean)
+```
+
+
+### **Phase 2 Description**
+
+In Phase 2, you will build predictive models to predict the variable "failure". You will develop
+multiple predictive models to predict this variable. You should fully document (in your R
+Markdown file, not in your PowerPoint deliverable) all model-building efforts. You should use a
+training/testing split and may choose to apply k-fold cross-validation when building your model on
+the training set. Please employ multiple techniques (logistic regression, classification trees, random
+forests, etc.).
+
+As in Phase 1, assume that your "audience" for this work is non-technical.
+
+### **Phase 2 Deliverables:**
+There are three deliverables for Phase 2:
+
+Deliverable 1: A PowerPoint presentation summarizing your findings from Phase 2. The
+presentation should be no more than seven slides (including a title slide). Your findings should
+focus on the practical implications of your findings. If your findings are "weak", you should indicate
+so. You should include appropriate charts/visuals in the presentation. There should NO VISIBLE R
+CODE in this deliverable. As noted above, you should assume that the target audience for the
+deliverable is relatively "non-technical."
+
+Deliverable 2: A knitted Word document of your Phase 2 R work.
+
+Submit Deliverables 1 and 2 via Canvas.
+
+Deliverable 3: You must submit your model predictions on the “test.csv” file to Kaggle. For each
+row in the “test.csv” file, you should predict whether or not the product will fail (No or Yes). See the
+“sample_submission.csv” file for an example of how to format your predictions on the “test.csv” file.
+You can submit multiple submissions if you wish. The submission that performs best will be the
+submission that
+
+Hints/Suggestions/Warnings for Phase 2:
+• Provide a simple summary table showing your models' performance on the training and
+testing sets.
+• There may be missingness that needs to be dealt with.

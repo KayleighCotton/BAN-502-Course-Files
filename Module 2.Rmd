@@ -1,0 +1,280 @@
+---
+title: "Module 2"
+author: "Kayleigh Cotton"
+date: "2025-05-20"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Simple Linear Regression and Correlation
+In this assignment you will complete a variety of tasks related to correlation and simple linear regression.
+Good habits I strongly recommend creating a new RStudio project for every assignment and for each lecture
+as you follow-along. Using a good directory structure will make it much easier for you to find your work later.
+Libraries: For this assignment you will need the following libraries: tidyverse, tidymodels, GGally, and
+lmtest.
+Read-in the “airquality” data set (a default R dataset) as a dataframe called “air”. To do this use the code
+below:
+air = airquality
+Details concerning this dataset can be found here: http://rpubs.com/Nitika/linearRegression_Airquality.
+
+```{r}
+install.packages("GGally")
+install.packages("lmtest")
+```
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(lmtest)
+air = airquality
+```
+
+Question 1 How many rows are in the “air” dataframe?
+153
+Question 2 How many columns are in the “air” dataframe?
+6
+Question 3 True/False: There is missing data in “Ozone” variable in the dataframe.
+true
+Question 4 Which variable is most likely to be the response (Y) variable?
+**A. Ozone**
+B. Solar.R
+C. Wind
+D. Temp
+E. Month
+F. Day
+We have three approaches that we can typically select from to deal with missing data:
+1. Delete the rows with missing data
+2. Delete the columns with missing data
+3. Impute (i.e., estimate or guess) values to replace the missing values
+Here we’ll choose to delete rows with any missing data. Use the code below to apply the “drop_na” function
+to the “air” dataframe. The resulting dataframe will be called “air2”. You will use this dataframe for the
+remainder of the assignment.
+air2 = air %>% drop_na()
+
+```{r}
+air2 = air %>% drop_na()
+```
+
+Question 5 How many rows remain in this new (air2) data frame?
+111
+Question 6 How many columns remain in this new (air2) data frame?
+6
+Use the “ggpairs” function to develop a visualization of the relationships in this dataset and to show correlation
+values for the combinations of variables.
+Then use the “ggcorr” function to develop a correlation matrix for the variables. Hint: Use “label = TRUE”
+in the “ggcorr” function to show the correlation values.
+
+```{r}
+ggpairs(air2)
+ggcorr(air2, label = TRUE)
+```
+
+Question 7 Which variable is most strongly correlated with the “Ozone” variable?
+1
+A. Solar.R
+B. Wind
+**C. Temp**
+D. Month
+E. Day
+Question 8 Which variable is least strongly correlated with the “Ozone” variable?
+A. Solar.R
+B. Wind
+C. Temp
+D. Month
+**E. Day**
+
+```{r}
+ggplot(air2, aes(Temp,Ozone)) +
+  geom_point()
+```
+
+Question 9 Plot “Temp” (x axis) versus “Ozone” (y axis) using the “ggplot” function. Choose an appropriate
+chart type. Which statement best describes the relationship between “Temp” and “Ozone”?
+A. As Temp increases, Ozone decreases
+B. As Temp increases there is no noticeable change in Ozone
+**C. As Temp increases, Ozone increases**
+Use Tidymodels to create a linear regression model using “Temp” to predict “Ozone”. You miss wish to call
+your model fit “lm_fit”.
+
+```{r}
+model <- lm(Ozone ~ Temp, air2)
+summary(model)
+```
+
+Question 10 What is the slope of this regression model (to four decimal places)?
+2.4391
+Question 11 what is the R-squared value of this model (not Adjusted R-squared) (to three decimal places)?
+0.488
+Question 12 Is the “Temp” variables significant in the model?
+Yes
+
+```{r}
+confint(lm(model))
+```
+
+Question 13 Use the code below to generate 95% confidence intervals for the coefficients. Note that you
+may need to change “lm_fit” to the name of your model fit if you used a different name.
+True/False: A 95% confidence interval for the slope coefficient does not contain zero.
+confint(lm_fit$fit$fit$fit)
+Question 14: Using your linear regression model with “Temp” to predict “Ozone”, what is the predicted
+“Ozone” value when “Temp” is equal to 80 (to two decimal places)?
+47.4819
+Question 15 Perform appropriate model diagnostics to verify whether or not the model appears to meet the
+four linear regression model assumptions.
+True/False: There is no evidence of non-independent (autocorrelated) residuals.
+
+
+
+## **Quiz 2** 
+
+Multiple Linear Regression and Special Issues Assignment
+In this assignment you will complete a variety of tasks related to multiple linear regression. The dataset
+we will be using is from a bike share service in Washington, DC. The dataset is described in detail in the
+“Readme.txt” file attached to this assignment.
+Libraries: For this assignment you may need the following libraries: tidyverse, tidymodels, glmnet, GGally,
+ggcorrplot, MASS, car, lubridate, lmtest, and splines. Feel free to install and library any other packages that
+you feel are needed.
+Data Ingest and Preparation:
+Read in the data from the “bike_cleaned.csv” file into a dataframe named “bike”. Take a moment to examine
+the summary and structure of the dataset.
+Several of the variables need to be converted into correct types before we can proceed:
+Convert “dteday” from a character variable to a date variable. The code below will perform this conversion:
+bike = bike %>% mutate(dteday = mdy(dteday))
+#Note that mdy is a lubridate package function
+#You can read more about lubridate here: https://lubridate.tidyverse.org/
+Convert the remaining character variables to factors. You can do this one variable at a time or use a
+“mutate_if”. This function examines each variable. If the variable is a character it is converted into a factor.
+Otherwise, the variable is left alone.
+bike = bike %>% mutate_if(is.character, as_factor)
+Finally, convert the “hr” variable into a factor. We do because, even though “hr” is numeric, we want to try
+each hour as a category. This can be a useful trick when you have a numeric variable with only a few unique
+values (DO NOT do this for numeric variables that are continuous and contain many unique values) and
+when the relationship between the numeric variable and the response variable is clearly nonlinear (as we will
+see in a moment when we plot “hr” versus the response variable).
+bike = bike %>% mutate(hr = as_factor(hr))
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+library(splines)
+```
+
+```{r}
+bike <- read_csv("~/Desktop/BAN 502- Predictive Analytics/Module 2/bike_cleaned-3.csv")
+bike = bike %>% mutate(dteday = mdy(dteday))
+bike = bike %>% mutate_if(is.character, as_factor)
+bike = bike %>% mutate(hr = as_factor(hr))
+ggpairs(bike, cardinality_threshold = 24)
+ggcorr(bike, label = TRUE)
+```
+
+Question 1 Which of the quantitative variables appears to be best correlated with “count”? NOTE: Ignore
+the “registered” and “casual” variable as the sum of these two variables equals “count”. Because these
+variables combine to make the response variable, they cannot be used as predictors. You can also ignore the
+“instant” variable as it is just a row number.
+A. windspeed
+B. hum
+C. atemp
+**D. temp**
+——
+Correlation and Categorical Variables We cannot use correlation to assess the relationship between
+a categorical predictor variable and our response variable. A good option is to visualize the relationship
+between the categorical and response variables via a boxplot (other visualizations can work too, but a boxplot
+is often a good place to start). Note that the categorical variable should be on the x-axis.
+If you create a boxplot for “hr” and “count” you will see that it is fairly obvious that “hr” affects “count”. It
+should also be obvious that the relationship between “hr” and “count” is not linear.
+Repeat this boxplot-based analysis for each of the categorical variables.
+
+```{r}
+ggplot(bike, aes(season,count)) +
+  geom_boxplot()
+```
+
+Question 2 Which “season” appears to have the highest count of rides?
+A. Winter
+B. Spring
+**C. Summer**
+D. Fall
+
+```{r}
+bikemodel <- lm(count ~ hr, bike)
+summary(bikemodel)
+```
+
+Question 3 Build a linear regression model (using tidymodels) with “hr” to predict “count”. You will use
+this model to answer the next several questions.
+How many dummy (indicator) variables are used to represent “hr” in the model?
+**23**
+Question 4 In your model from Question 3, which hour is selected as the “base” level (category)? The base
+level does not have an associated coefficient (slope) in the linear regression model.
+**hr 0**
+Question 5 During which hour of the day does the model predict the highest number of rides?
+**hr17**
+
+```{r}
+ggplot(bike, aes(temp,count)) +
+  geom_point()
+```
+
+Question 6 Plot “temp” (x axis) versus “count” (y axis) using an appropriate plot type.
+Which statement best describes the general relationship between “temp” and “count”?
+**A. As “temp” increases, “count” appears to generally increase.**
+B. As “temp” increases, “count” appears to generally decrease.
+C. There does not appear to be a relationship between “temp” and “count”.
+
+```{r}
+bikemodel2 <- lm(count ~ hr + temp, bike)
+summary(bikemodel2)
+```
+
+Question 7 Create a linear regression model (using tidymodels) with “hr” and “temp” to predict “count”.
+You will use this model to answer the next several questions.
+What is the value of the slope coefficient for “hr23” in this model (to three decimal places)?
+**31.748**
+Question 8 What is the adjusted R-squared value (to four decimal places) for the model from Question 7?
+**0.5886**
+
+```{r}
+bikemodel3 <- lm(count ~ atemp + temp, bike)
+summary(bikemodel3)
+```
+
+Question 9 Create a linear regression model (using tidymodels as usual) with “temp” and “atemp” to predict
+“count”. What is the adjusted R-squared value (to four decimal places) of this model?
+**0.1638**
+Question 10 Which of the two variables in the model from Question 9 are significant?
+**A. temp ONLY**
+B. atemp ONLY
+C. Neither temp nor atemp are significant
+D. Both temp and atemp are significant
+Question 11 The model from Question 9 likely demonstrates which phenomenon?
+A. Non-constant variance of residuals
+B. Non-normality of residuals
+**C. Multicollinearity**
+D. None of these
+Question 12 Build a backward stepwise regression model to predict “count”. Your “allmod” (the starting
+model) should include the following variables: season, mnth, hr, holiday, weekday, workingday, weathersit,
+temp, atemp, hum, and windspeed.
+In the “allmod” you should see that the “workingday” variable appears with “NA” values in the model
+summary. This is happening because “workingday” is a perfect combination of two other predictor variables.
+Which two variables combine to make “workingday”?
+A. season and mnth
+**B. weekday and holiday**
+C. hr and mnth
+D. season and mnth
+Question 13 The backward stepwise method removes only one variable. Which variable is removed?
+A. windspeed
+**B. workingday**
+2
+C. hum
+D. holiday
+3

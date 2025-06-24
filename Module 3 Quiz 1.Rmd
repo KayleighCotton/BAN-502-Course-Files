@@ -1,0 +1,87 @@
+---
+title: "Module 3 Quiz 1"
+author: "Kayleigh Cotton"
+date: "2025-05-24"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+###**Model Validation**
+Libraries: For this assignment you will need the following libraries: tidyverse, lubridate, and tidymodels.
+Before beginning the assignment tasks, read-in the “bike_cleaned.csv” file into a data frame called “bike”. This
+is the same data that you used in the Module 2 Multiple Linear Regression and Special Issues assignment. As
+we did in that assignment you should convert “dteday” from a character variable to a date variable. Convert
+the remaining character variables to factors. You can do this one variable at a time or use a “mutate_if”.
+Finally, convert the “hr” variable into a factor.
+
+```{r Libraries and Importing}
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+bike <- read_csv("~/Desktop/BAN 502- Predictive Analytics/Module 3/bike_cleaned-4.csv")
+bike = bike %>% mutate(dteday = mdy(dteday))
+bike = bike %>% mutate_if(is.character, as_factor)
+bike = bike %>% mutate(hr = as_factor(hr))
+```
+
+```{r Split into Training and Testing Sets} 
+set.seed(1234)
+bike_split = initial_split(bike, prop = 0.70, strata = count)
+train_bike = training(bike_split)
+test_bike = testing(bike_split)
+```
+
+Question 1: Split the data into training and testing sets. Your training set should have 70% of the data.
+Use a random number (set.seed) of 1234. Your split should be stratified by the “count” variable.
+How many rows of data are in the training set? I know it’s probably a bit annoying to keep answering this
+question about the number of rows, but it’s helpful to be able to validate that your split code is correct before
+proceeding :)
+**12163**
+
+Question 2 Stratifying the split by the “count” variable serves what purpose?
+A. Stratifying by “count” ensures that unusual values for “count” are eliminated
+**B. Stratifying by “count” ensures that “count” is similarly represented in both the training and testing sets**
+C. Stratifying by “count” ensures that the training set contains the “count” variable
+D. None of the above
+
+```{r Linear Regression Model and Performance}
+bike_recipe = recipe(count ~ season + mnth + hr + holiday + weekday + temp + weathersit, train_bike)
+
+lm_model = #give the model type a name 
+  linear_reg() %>% #specify that we are doing linear regression
+  set_engine("lm") #specify the specify type of linear tool we want to use 
+
+lm_wflow = 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(bike_recipe)
+
+lm_fit = fit(lm_wflow, train_bike)
+
+summary(lm_fit$fit$fit$fit)
+
+predict_train_bike <- predict(test_bike) %>% bind_cols(test_bike) %>% metrics(truth = count, estimate = .pred)
+
+lm_fit %>% predict(test_bike) %>% bind_cols(test_bike) %>% metrics(truth = count, estimate = .pred)
+```
+
+Question 3: Build a linear regression model (using the training set) to predict “count” using the variables
+“season”, “mnth”, “hr”, “holiday”, and “weekday”, “temp”, and “weathersit”.
+What is the adjusted R-squared value (to four digits) of the resulting model?
+**0.6209**
+
+Question 4: Use the predict functions to make predictions (using your model from Question 3) on the
+training set. Hint: Be sure to store the predictions in an object, perhaps named “predict_train”
+or similar. Develop a histogram of the predictions (Hint: The predictions are likely stored in a variable
+called “.pred” in your predictions object).
+Select the statements below that are likely true about the distribution of predictions?
+**A. The maximum number of rides predicted for an hour is around 600**
+B. The average number of rides predicted per hour is around 450
+**C. Some predictions for the number of rides in an hour are negative**
+D. None of these statements are true
+
+Question 5: Determine the performance of your model on the testing set.
+What is the R-squared value (to four decimal places) of your model on the testing set? REMINDER: DO
+NOT build a model on the testing set. Use your model that was developed on the training set.
+**0.6270**

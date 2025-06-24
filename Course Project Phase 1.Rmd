@@ -1,0 +1,77 @@
+---
+title: "Course Project Phase 1"
+author: "Kayleigh Cotton"
+date: "2025-06-01"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Loading Packages and importing dataset}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+library(splines)
+library(mice) #package for imputation
+library(VIM) #visualizing missingness
+library(naniar) #visualizing missingness
+library(ranger) #for random forests
+library(randomForest) #also for random forests
+library(caret)
+library(skimr) #alternative way to view dataset summaries
+library(UpSetR)
+train_set <- read_csv("~/Desktop/BAN 502- Predictive Analytics/Course Project/train.csv")
+```
+
+```{r Summary of the Data}
+str(train_set)
+summary(train_set)
+skim(train_set)
+ggcorr(train_set)
+```
+
+Row wise deletion of any row with at least one missing variable
+```{r Row Wise Deletion}
+train_rowdel = train_set %>% drop_na() 
+skim(train_rowdel)
+```
+This removed 14,387 rows or 54.15% of the rows.
+
+
+```{r Imputing the missing data}
+set.seed(1234)
+imp_train = mice(train_set, m=5, method = 'pmm',printFlag = FALSE)
+summary(imp_train)
+```
+
+```{r}
+train_set_complete = complete(imp_train)
+str(train_set_complete)
+summary(train_set_complete)
+skim(train_set_complete)
+ggcorr(train_set_complete)
+```
+
+### **Phase 1 Project Description**
+For Phase 1 you will conduct a thorough exploratory/descriptive analysis of the dataset. Please
+**DO NOT** build any predictive models (e.g., logistic regression, trees, etc.) in this phase.
+Assume that your "audience" for this work are non-technical decision-makers.
+### **Phase 1 Deliverables:**
+There are two deliverables for Phase 1.
+
+Deliverable 1: A PowerPoint presentation summarizing your findings from Phase 1. The
+presentation should be no more than seven slides (including a title slide). Your findings should
+indicate which variables may be strong predictors of the "failure" variable (this is your response
+variable) and any other interesting descriptive findings. You should include charts/visuals in the
+presentation. There should be NO VISIBLE R CODE in this deliverable. As noted above, you should
+assume that the target audience for the deliverable is relatively "non-technical." NOTE: If you create
+any variables (i.e., by combining or modifying existing variables), please note this.
+
+Deliverable 2: A knitted Word document of your Phase 1 R work.
+
